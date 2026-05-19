@@ -1,0 +1,22 @@
+# Node
+node_modules/
+dist/
+.env.local
+.env
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+venv/
+env/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+
+# Local data
+backend/data/
+*.db
+backend/alembic.ini
