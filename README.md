@@ -82,5 +82,10 @@ Sistem baştan aşağı yenilenerek, modern uygulamaların trendi olan **Glassmo
 
 ---
 
+## 👥 Geliştiriciler
+Bu proje **Mehmet AKALIN**, **Serhat KABA** ve **Emre ÖZCAN** tarafından geliştirilmiştir.
+
+---
+
 ## 📝 Lisans
 Bu projenin tüm telif hakları geliştiricisine ve projeyi talep eden kuruma aittir. İzinsiz kopyalanamaz veya çoğaltılamaz.
