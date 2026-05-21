@@ -35,39 +35,38 @@ export default function TopBar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Profil fotoğrafını yükle (mount’ta ve her güncellemede çağrılır)
+  const loadAvatar = React.useCallback(async () => {
+    try {
+      const src = await getProfilePicture({ cacheBust: true });
+      if (lastBlobUrlRef.current && lastBlobUrlRef.current.startsWith("blob:")) {
+        URL.revokeObjectURL(lastBlobUrlRef.current);
+        lastBlobUrlRef.current = null;
+      }
+      setAvatarSrc(src || FALLBACK_AVATAR);
+    } catch {
+      setAvatarSrc(FALLBACK_AVATAR);
+    }
+  }, []);
+
   // ✅ Mount olduğunda profil fotoğrafını getir
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        // cacheBust: true → varsa tarayıcı cache’ini baypas et (sunucu 1 saat cache’liyor olabilir)
-        const src = await getProfilePicture({ cacheBust: true });
-
-        if (cancelled) return;
-
-        // Eski blob URL varsa temizle (biz dataURL dönüyoruz; blob ihtimaline karşı güvenlik)
-        if (lastBlobUrlRef.current && lastBlobUrlRef.current.startsWith("blob:")) {
-          URL.revokeObjectURL(lastBlobUrlRef.current);
-          lastBlobUrlRef.current = null;
-        }
-
-        setAvatarSrc(src || FALLBACK_AVATAR);
-      } catch (err) {
-        // Ağ hatası / yetki / 404 vb. durumda fallback kullan
-        if (!cancelled) setAvatarSrc(FALLBACK_AVATAR);
-      }
-    })();
+    loadAvatar();
 
     return () => {
-      cancelled = true;
-      // Topbar unmount olurken olası blob URL’yi temizle
       if (lastBlobUrlRef.current && lastBlobUrlRef.current.startsWith("blob:")) {
         URL.revokeObjectURL(lastBlobUrlRef.current);
         lastBlobUrlRef.current = null;
       }
     };
-  }, []);
+  }, [loadAvatar]);
+
+  // ✅ Profil fotoğrafı güncellendiğinde yeniden yükle
+  useEffect(() => {
+    const handler = () => loadAvatar();
+    window.addEventListener("profilePhotoUpdated", handler);
+    return () => window.removeEventListener("profilePhotoUpdated", handler);
+  }, [loadAvatar]);
 
   const handleLogout = () => {
     dispatch(logoutUser());

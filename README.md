@@ -2,9 +2,10 @@
 
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.116-005571?style=for-the-badge&logo=fastapi)
 ![React](https://img.shields.io/badge/React-19-20232a?style=for-the-badge&logo=react&logoColor=61DAFB)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-316192?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-red?style=for-the-badge)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 Tümen Alüminyum için geliştirilmiş; **bayi yönetimi**, **proje tekliflendirme**, **sipariş takibi** ve **üretim süreçlerini** dijitalleştiren tam yığın (full-stack) web uygulaması.
 
@@ -59,7 +60,6 @@ Tümen Alüminyum için geliştirilmiş; **bayi yönetimi**, **proje tekliflendi
 veritabani_odev/
 ├── backend/
 │   ├── app/
-│   │   ├── api/            # Bağımlılık enjeksiyonu (deps.py)
 │   │   ├── core/           # Ayarlar, güvenlik, e-posta
 │   │   ├── crud/           # Veritabanı işlem katmanı (16 modül)
 │   │   ├── db/             # SQLAlchemy engine & session
@@ -71,6 +71,8 @@ veritabani_odev/
 │   ├── migrations/         # Alembic migrasyon dosyaları (40+ versiyon)
 │   ├── main.py             # FastAPI uygulama giriş noktası
 │   ├── requirements.txt    # Python bağımlılıkları
+│   ├── Dockerfile          # Backend Docker imajı
+│   ├── entrypoint.sh       # Migrasyon + sunucu başlatma betiği
 │   └── .env                # Ortam değişkenleri (repo'ya dahil değil)
 ├── frontend/
 │   ├── src/
@@ -79,8 +81,11 @@ veritabani_odev/
 │   │   ├── redux/          # Actions, reducers, store
 │   │   ├── lib/            # API istemcisi, yardımcılar
 │   │   └── components/     # Paylaşılan UI bileşenleri
+│   ├── Dockerfile          # Çok aşamalı build (node → nginx)
+│   ├── nginx.conf          # SPA yönlendirme + statik dosya cache
 │   ├── .env.local          # Ortam değişkenleri (repo'ya dahil değil)
 │   └── package.json
+├── docker-compose.yml      # 3 servis: db · backend · frontend
 └── README.md
 ```
 
@@ -88,19 +93,96 @@ veritabani_odev/
 
 ## Kurulum
 
-### Gereksinimler
-- Python 3.10+
-- Node.js 18+
-- PostgreSQL 14+
+Projeyi iki farklı şekilde çalıştırabilirsiniz: **Docker ile (önerilen)** veya **Manuel kurulum**.
 
-### 1. Repoyu Klonlayın
+---
+
+### 🐳 Docker ile Kurulum (Önerilen)
+
+En hızlı ve taşınabilir yöntem. Tek komutla 3 servis (PostgreSQL, Backend, Frontend) ayağa kalkar.
+
+#### Gereksinimler
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/macOS) veya Docker Engine (Linux)
+
+#### 1. Repoyu Klonlayın
 
 ```bash
 git clone https://github.com/akalnmehmet/2058_veritabani.git
 cd 2058_veritabani
 ```
 
-### 2. Backend Kurulumu
+#### 2. Servisleri Başlatın
+
+```bash
+docker compose up -d --build
+```
+
+> İlk çalıştırmada imajlar build edilir (~3-5 dk). Alembic migrasyonları otomatik uygulanır.
+
+#### 3. İlk Admin Kullanıcısını Oluşturun
+
+```bash
+docker exec tumen_backend python -c "
+import sys; sys.path.insert(0,'.')
+import app.models.app_user, app.models.order, app.models.customer
+import app.models.project, app.models.system, app.models.color
+import app.models.glass_type, app.models.other_material, app.models.profile
+import app.models.remote, app.models.RefreshToken, app.models.user_token
+import app.models.pdf, app.models.calculation_helper
+import app.models.dealer_profile_picture, app.models.project_code_rule
+import app.models.project_code_ledger, app.models.system_glass_template
+import app.models.system_material_template, app.models.system_profile_template
+import app.models.system_remote_template
+import uuid
+from app.db.session import SessionLocal
+from app.models.app_user import AppUser
+from app.core.security import get_password_hash
+db = SessionLocal()
+existing = db.query(AppUser).filter(AppUser.username == 'admin').first()
+if existing:
+    print('Admin zaten mevcut!')
+else:
+    db.add(AppUser(id=uuid.uuid4(), username='admin', password_hash=get_password_hash('admin123'), role='admin', name='Admin', email='admin@tumen.com', status='active'))
+    db.commit()
+    print('Admin olusturuldu.')
+print('Kullanici adi: admin | Sifre: admin123')
+db.close()
+"
+```
+
+#### 4. Uygulamaya Erişin
+
+| Servis | Adres |
+|--------|-------|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
+
+#### Servisleri Durdurmak
+
+```bash
+docker compose down          # Servisleri durdur (veriler korunur)
+docker compose down -v       # Servisleri durdur + veritabanını sil
+```
+
+#### Logları İzlemek
+
+```bash
+docker compose logs -f              # Tüm servisler
+docker compose logs -f backend      # Sadece backend
+docker compose logs -f frontend     # Sadece frontend
+```
+
+---
+
+### 🔧 Manuel Kurulum
+
+#### Gereksinimler
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 14+
+
+##### 2. Backend Kurulumu
 
 ```bash
 cd backend
@@ -172,7 +254,7 @@ EOF
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 3. Frontend Kurulumu
+#### 3. Frontend Kurulumu
 
 ```bash
 cd frontend
@@ -201,7 +283,7 @@ npm run dev
 | Backend API | http://localhost:8000 |
 | Swagger UI | http://localhost:8000/docs |
 
-**Varsayılan Admin Girişi:**
+**Varsayılan Admin Girişi** (ilk kurulumda yukarıdaki script ile oluşturulur):
 - Kullanıcı adı: `admin`
 - Şifre: `admin123`
 

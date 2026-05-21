@@ -1,6 +1,5 @@
 // Path: @/scenes/ayarlar/ProfilePhotoSection.tsx
 import React, { useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
 import AppButton from "@/components/ui/AppButton";
 import { CellSpinner } from "./Spinner";
 import { useModal } from "@/shared/modals/ModalProvider";
@@ -50,7 +49,6 @@ async function toSquareJpegBlob(file: File, size = 512, quality = 0.92): Promise
 }
 
 export default function ProfilePhotoSection() {
-  const dispatch = useDispatch();
   const { openModal } = useModal();
 
   const FALLBACK_IMG = "/profilfoto.png";
@@ -93,12 +91,14 @@ export default function ProfilePhotoSection() {
       },
       upload: async (file: File) => {
         const blob = await toSquareJpegBlob(file, 512, 0.92);
-        await dispatch(updateProfilePicture(blob) as any);
+        await updateProfilePicture(blob);
         await loadProfilePhoto();
+        window.dispatchEvent(new Event("profilePhotoUpdated"));
       },
       remove: async () => {
-        await dispatch(deleteProfilePicture() as any);
+        await deleteProfilePicture();
         setPfSrc(null);
+        window.dispatchEvent(new Event("profilePhotoUpdated"));
       },
     });
   };
@@ -106,8 +106,9 @@ export default function ProfilePhotoSection() {
   const handleDelete = async () => {
     try {
       setPfDeleting(true);
-      await dispatch(deleteProfilePicture() as any);
+      await deleteProfilePicture();
       setPfSrc(null);
+      window.dispatchEvent(new Event("profilePhotoUpdated"));
     } finally {
       setPfDeleting(false);
     }

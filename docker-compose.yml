@@ -1,0 +1,63 @@
+services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────────
+  db:
+    image: postgres:17-alpine
+    container_name: tumen_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "230423"
+      POSTGRES_DB: tumen_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"        # host:5433 → container:5432 (yerel 5432 ile çakışmasın)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tumen_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Backend (FastAPI) ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tumen_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:230423@db:5432/tumen_db
+      SECRET_KEY: docker-secret-key-lutfen-degistirin-guclu-bir-deger
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      REFRESH_TOKEN_EXPIRE_DAYS: "30"
+      MEDIA_ROOT: media
+      FRONTEND_URL: http://localhost:5173
+      BACKEND_CORS_ORIGINS_RAW: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:80,http://localhost"
+      DEBUG: "True"
+    ports:
+      - "8000:8000"
+    volumes:
+      - media_data:/app/media
+
+  # ── Frontend (React → nginx) ──────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8000/api
+    container_name: tumen_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres_data:
+  media_data:
