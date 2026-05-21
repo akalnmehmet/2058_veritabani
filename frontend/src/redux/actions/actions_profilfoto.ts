@@ -24,6 +24,10 @@ export async function getProfilePicture({ cacheBust = false } = {}) {
       undefined // dispatch gerekmiyorsa undefined kalabilir
     );
 
+    if (res.status === 404) {
+      return null; // Henüz profil fotoğrafı yok — normal durum
+    }
+
     if (!res.ok) {
       const text = await safeText(res);
       throw new Error(`Profil foto alınamadı: ${res.status} ${text}`);

@@ -1,205 +1,201 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
+# app/routes/auth.py
+
+from datetime import timedelta
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from typing import Optional
-from pydantic import BaseModel
-from app.db.database import get_db
-from app.models.user import AppUser, RefreshToken, UserToken
-from app.core.security import verify_password, get_password_hash, create_access_token, create_refresh_token, decode_token
-from app.core.deps import get_current_user
+
+from app.db.session import get_db
+from app.schemas.token import Token
+from app.schemas.user import UserOut
+from app.models.app_user import AppUser
+from app.crud.user import get_user_by_username, get_user_by_id
+from app.core.security import (
+    verify_password,
+    create_access_token,
+    get_current_user,
+)
 from app.core.config import settings
-import uuid
+from app.schemas.token import TokenResponse
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+# 🔁 refresh token CRUD yardımcıları
+from app.crud.refresh_token import (
+    mint_refresh_token,
+    consume_and_rotate,
+    revoke_token,
+    revoke_all_for_user,
+)
 
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    role: str | None = None
-    is_admin: bool = False
-
-
-class RefreshResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    role: str | None = None
-    is_admin: bool = False
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
-class MeResponse(BaseModel):
-    id: str
-    username: str
-    role: str
-    is_admin: bool
+# ----- Cookie yardımcıları -----
+# app/routes/auth.py (yardımcı fonksiyonların yerine)
 
-    model_config = {"from_attributes": True}
+def _normalize_cookie_domain(raw: str | None) -> str | None:
+    if not raw or not raw.strip():
+        return None
+    try:
+        return raw.strip().encode("idna").decode("ascii")
+    except Exception:
+        return None
+
+def set_refresh_cookie(response: Response, token: str, max_age_seconds: int | None = None) -> None:
+    default_days = int(getattr(settings, "REFRESH_TOKEN_EXPIRE_DAYS", 30))
+    max_age = int(max_age_seconds if max_age_seconds is not None else default_days * 24 * 3600)
+    cookie_name = getattr(settings, "REFRESH_COOKIE_NAME", "refresh_token")
+    cookie_secure = bool(getattr(settings, "REFRESH_COOKIE_SECURE", False))
+    cookie_samesite = getattr(settings, "REFRESH_COOKIE_SAMESITE", "lax")
+    raw_domain = getattr(settings, "REFRESH_COOKIE_DOMAIN", None)
+    cookie_domain = _normalize_cookie_domain(raw_domain)
+
+    response.set_cookie(
+        key=cookie_name,
+        value=token,
+        httponly=True,
+        secure=cookie_secure,
+        samesite=cookie_samesite,
+        domain=cookie_domain,
+        max_age=max_age,
+        path="/",
+    )
+
+def clear_refresh_cookie(response: Response) -> None:
+    cookie_name = getattr(settings, "REFRESH_COOKIE_NAME", "refresh_token")
+    raw_domain = getattr(settings, "REFRESH_COOKIE_DOMAIN", None)
+    cookie_domain = _normalize_cookie_domain(raw_domain)
+    response.delete_cookie(key=cookie_name, domain=cookie_domain, path="/")
 
 
-class ChangePasswordRequest(BaseModel):
-    old_password: str
-    new_password: str
 
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    password: str
-
-
-class ForgotPasswordRequest(BaseModel):
-    email: str
-
-
-class ChangeUsernameRequest(BaseModel):
-    new_username: str
-
-
-@router.post("/token", response_model=TokenResponse)
-def login(
+# ----- LOGIN: access + refresh(cookie) -----
+@router.post("/token", response_model=TokenResponse, summary="Login for access token (sets refresh cookie)")
+def login_for_access_token(
     response: Response,
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
+    remember_me: bool = Form(False),
     db: Session = Depends(get_db),
 ):
-    user = db.query(AppUser).filter(AppUser.username == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
+    """
+    Kullanıcıyı doğrular, kısa ömürlü access token döner ve
+    uzun ömürlü refresh token'ı HttpOnly cookie olarak set eder.
+    Ayrıca { is_admin, role } alanlarını JSON içinde döner.
+    """
+    user = get_user_by_username(db, form_data.username)
+    if not user or user.is_deleted:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Kullanıcı adı veya şifre hatalı",
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user.status != "active" or not user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account is not active",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token = create_access_token({"sub": user.id, "role": user.role})
-    refresh_token_str = create_refresh_token({"sub": user.id, "role": user.role})
+    # Access token
+    access_token_expires = timedelta(minutes=int(getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 30)))
+    access_token = create_access_token(data={"sub": str(user.id)}, expires_delta=access_token_expires)
 
-    # Save refresh token
-    rt = RefreshToken(
-        id=str(uuid.uuid4()),
-        user_id=user.id,
-        token=refresh_token_str,
-        is_active=True,
-    )
-    db.add(rt)
-    db.commit()
+    # Refresh cookie
+    ua = request.headers.get("User-Agent")
+    ip = request.client.host if request.client else None
+    refresh_days = int(getattr(settings, "REFRESH_TOKEN_EXPIRE_DAYS", 30)) if remember_me else 1
+    plain_refresh, _ = mint_refresh_token(db, user.id, ua, ip, ttl_days=refresh_days)
+    set_refresh_cookie(response, plain_refresh, max_age_seconds=refresh_days * 24 * 3600)
 
-    # Set refresh token as HTTP-only cookie
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token_str,
-        httponly=True,
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
-        samesite="lax",
-    )
-
-    return TokenResponse(
-        access_token=access_token,
-        role=user.role,
-        is_admin=(user.role == "admin"),
-    )
+    # ✅ genişletilmiş yanıt
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "is_admin": (user.role == "admin"),
+        "role": user.role,
+    }
 
 
-@router.post("/refresh", response_model=RefreshResponse)
-def refresh_token(
+
+# ----- REFRESH: access yenile + refresh rotasyon -----
+@router.post("/refresh", response_model=TokenResponse, summary="Refresh access token (rotates refresh cookie)")
+def refresh_access_token(
     response: Response,
-    refresh_token: Optional[str] = Cookie(default=None),
+    request: Request,
     db: Session = Depends(get_db),
 ):
-    if not refresh_token:
-        raise HTTPException(status_code=401, detail="Refresh token bulunamadı")
+    """
+    HttpOnly cookie'deki refresh token doğrulanır ve rotasyonlanır.
+    Yeni access token + { is_admin, role } döner; yeni refresh cookie set edilir.
+    """
+    cookie_name = getattr(settings, "REFRESH_COOKIE_NAME", "refresh_token")
+    plain = request.cookies.get(cookie_name)
+    if not plain:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
 
-    payload = decode_token(refresh_token)
-    if not payload or payload.get("type") != "refresh":
-        raise HTTPException(status_code=401, detail="Geçersiz refresh token")
+    try:
+        user, new_plain, lifetime_seconds = consume_and_rotate(
+            db,
+            plain,
+            user_agent=request.headers.get("User-Agent"),
+            ip=request.client.host if request.client else None,
+        )
+    except ValueError:
+        clear_refresh_cookie(response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
-    user_id = payload.get("sub")
-    db_rt = db.query(RefreshToken).filter(
-        RefreshToken.token == refresh_token,
-        RefreshToken.user_id == user_id,
-        RefreshToken.is_active == True,
-    ).first()
+    minutes = int(getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+    access_token = create_access_token({"sub": str(user.id)}, expires_delta=timedelta(minutes=minutes))
 
-    if not db_rt:
-        raise HTTPException(status_code=401, detail="Refresh token geçersiz veya iptal edilmiş")
+    set_refresh_cookie(response, new_plain, max_age_seconds=lifetime_seconds)
 
-    user = db.query(AppUser).filter(AppUser.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Kullanıcı bulunamadı")
-
-    new_access_token = create_access_token({"sub": user.id, "role": user.role})
-
-    return RefreshResponse(
-        access_token=new_access_token,
-        role=user.role,
-        is_admin=(user.role == "admin"),
-    )
-
-
-@router.get("/me", response_model=MeResponse)
-def get_me(current_user: AppUser = Depends(get_current_user)):
-    return MeResponse(
-        id=current_user.id,
-        username=current_user.username,
-        role=current_user.role,
-        is_admin=(current_user.role == "admin"),
-    )
+    # ✅ genişletilmiş yanıt
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "is_admin": (user.role == "admin"),
+        "role": user.role,
+    }
 
 
-@router.post("/logout")
+
+# ----- LOGOUT: tek cihaz -----
+@router.post("/logout", summary="Logout from current device (revokes this refresh)")
 def logout(
     response: Response,
-    refresh_token: Optional[str] = Cookie(default=None),
+    request: Request,
     db: Session = Depends(get_db),
 ):
-    if refresh_token:
-        db_rt = db.query(RefreshToken).filter(RefreshToken.token == refresh_token).first()
-        if db_rt:
-            db_rt.is_active = False
-            db.commit()
-    response.delete_cookie("refresh_token")
-    return {"message": "Çıkış yapıldı"}
+    cookie_name = getattr(settings, "REFRESH_COOKIE_NAME", "refresh_token")
+    plain = request.cookies.get(cookie_name)
+    if plain:
+        revoke_token(db, plain)
+    clear_refresh_cookie(response)
+    return {"ok": True}
 
 
-@router.post("/change-password")
-def change_password(
-    req: ChangePasswordRequest,
+# ----- LOGOUT-ALL: tüm cihazlar -----
+@router.post("/logout-all", summary="Logout from all devices (revokes all refresh tokens)")
+def logout_all(
+    response: Response,
     current_user: AppUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not verify_password(req.old_password, current_user.password_hash):
-        raise HTTPException(status_code=400, detail="Mevcut şifre hatalı")
-    current_user.password_hash = get_password_hash(req.new_password)
-    db.commit()
-    return {"message": "Şifre başarıyla değiştirildi"}
+    count = revoke_all_for_user(db, current_user.id)
+    clear_refresh_cookie(response)
+    return {"revoked": count}
 
 
-@router.post("/change-username")
-def change_username(
-    req: ChangeUsernameRequest,
+# ----- Kimliği doğrulanmış kullanıcı -----
+@router.get("/me", response_model=UserOut, summary="Get current authenticated user")
+def read_users_me(
     current_user: AppUser = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
-    existing = db.query(AppUser).filter(AppUser.username == req.new_username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Bu kullanıcı adı zaten kullanılıyor")
-    current_user.username = req.new_username
-    db.commit()
-    return {"message": "Kullanıcı adı güncellendi", "username": req.new_username}
-
-
-@router.post("/forgot-password")
-def forgot_password(req: ForgotPasswordRequest):
-    # Email sistemi kurulmadı — stub olarak döner
-    return {"message": "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi."}
-
-
-@router.post("/reset-password")
-def reset_password_with_token(req: ResetPasswordRequest, db: Session = Depends(get_db)):
-    payload = decode_token(req.token)
-    if not payload:
-        raise HTTPException(status_code=400, detail="Geçersiz veya süresi dolmuş token")
-    user_id = payload.get("sub")
-    user = db.query(AppUser).filter(AppUser.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
-    user.password_hash = get_password_hash(req.password)
-    db.commit()
-    return {"message": "Şifreniz sıfırlandı"}
+    """Mevcut oturumun kullanıcısını döner."""
+    return current_user

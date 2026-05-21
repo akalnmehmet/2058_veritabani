@@ -1,0 +1,22 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# VS Code ayarları
+.vscode/
+
+# Sanal ortam
+venv/
+
+# Local env files
+.env
+.env.*
+.env.example
+
+media/
+profile_images/
+system_photos/
+variant_photos/
+body.json
+deploy_backend.sh
+run.sh

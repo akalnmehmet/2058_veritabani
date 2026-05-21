@@ -1,0 +1,513 @@
+﻿from pydantic import BaseModel, Field
+from uuid import UUID
+from datetime import datetime
+from typing import Optional, List
+
+from app.schemas.catalog import RemoteOut
+
+
+# --- Ortak PDF bayrakları şeması ---
+class PdfFlags(BaseModel):
+    camCiktisi: bool = True
+    profilAksesuarCiktisi: bool = True
+    boyaCiktisi: bool = True
+    siparisCiktisi: bool = True
+    optimizasyonDetayliCiktisi: bool = True
+    optimizasyonDetaysizCiktisi: bool = True
+
+
+# ——————————————————————
+# System CRUD Schemas
+# — System entity —
+class SystemBase(BaseModel):
+    name: str = Field(..., min_length=1)
+    description: Optional[str] = None
+    photo_url: Optional[str] = None
+
+class SystemCreate(SystemBase):
+    """Fields for creating a new System"""
+    is_active: Optional[bool] = True  # ✅ is_active (opsiyonel, varsayılan true)
+    # ✅ Yeni: başlangıç sırası (opsiyonel)
+    sort_index: Optional[int] = 0
+
+class SystemUpdate(BaseModel):
+    """Fields for updating an existing System"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    photo_url: Optional[str] = None
+    # ✅ publish/unpublish için
+    is_published: Optional[bool] = None
+    # ✅ aktif/pasif etiketi
+    is_active: Optional[bool] = None   # ✅ is_active
+    # ✅ Yeni: sıralama güncelleme (opsiyonel)
+    sort_index: Optional[int] = None
+
+class SystemOut(SystemBase):
+    id: UUID
+    photo_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    # ✅ publish durumu
+    is_published: bool
+    # ✅ aktif/pasif durumu
+    is_active: bool  # ✅ is_active
+    # ✅ Yeni: sıralama bilgisi
+    sort_index: int
+
+    class Config:
+        from_attributes = True
+
+# ——————————————————————
+# SystemVariant CRUD Schemas —
+class SystemVariantBase(BaseModel):
+    system_id: UUID
+    name: str = Field(..., min_length=1)
+    photo_url: Optional[str] = None
+    pdf_foto_cikti: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class SystemVariantCreate(SystemVariantBase):
+    """Fields for creating a System Variant"""
+    is_active: Optional[bool] = True  # ✅ is_active (opsiyonel, varsayılan true)
+    # ✅ Yeni: başlangıç sırası (opsiyonel)
+    sort_index: Optional[int] = 0
+
+class SystemVariantUpdate(BaseModel):
+    """Fields for updating a System Variant"""
+    name: Optional[str] = None
+    photo_url: Optional[str] = None
+    pdf_foto_cikti: Optional[str] = None
+    # ✅ publish/unpublish için
+    is_published: Optional[bool] = None
+    # ✅ aktif/pasif etiketi
+    is_active: Optional[bool] = None   # ✅ is_active
+    # ✅ Yeni: sıralama güncelleme (opsiyonel)
+    sort_index: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+class SystemVariantOut(SystemVariantBase):
+    id: UUID
+    photo_url: Optional[str] = None
+    pdf_foto_cikti: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    # ✅ publish durumu
+    is_published: bool
+    # ✅ aktif/pasif durumu
+    is_active: bool  # ✅ is_active
+    # ✅ Yeni: sıralama bilgisi
+    sort_index: int
+
+    system_name: str  # ilgili System kaydının name alanı
+
+    class Config:
+        from_attributes = True
+
+
+class SystemPageOut(BaseModel):
+    items: List[SystemOut]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+class SystemVariantPageOut(BaseModel):
+    items: List[SystemVariantOut]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+# ——————————————————————
+# Combined System & Variant & Glass create schema
+class GlassConfig(BaseModel):
+    glass_type_id: UUID
+    formula_width: str = Field(..., min_length=1)
+    formula_height: str = Field(..., min_length=1)
+    formula_count: str = Field(..., min_length=1)
+
+class VariantConfig(BaseModel):
+    name: str = Field(..., min_length=1)
+    photo_url: Optional[str] = None
+    pdf_foto_cikti: Optional[str] = None
+    is_active: Optional[bool] = True  # ✅ is_active (opsiyonel)
+    # ✅ Yeni: başlangıç sırası (opsiyonel)
+    sort_index: Optional[int] = 0
+
+class SystemFullCreate(BaseModel):
+    name: str = Field(..., min_length=1)
+    description: Optional[str] = None
+    photo_url: Optional[str] = None
+    is_active: Optional[bool] = True  # ✅ is_active (opsiyonel)
+    # ✅ Yeni: system başlangıç sırası (opsiyonel)
+    sort_index: Optional[int] = 0
+    variant: VariantConfig
+    glass_configs: Optional[List[GlassConfig]] = []
+
+# ——————————————————————
+# Katalog Nesneleri: Profil, Cam, Malzeme
+class ProfileOut(BaseModel):
+    id: UUID
+    profil_kodu: str
+    profil_isim: str
+    profil_kesit_fotograf: Optional[str]
+    birim_agirlik: float
+    boy_uzunluk: float
+    unit_price: Optional[float] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class GlassTypeOut(BaseModel):
+    id: UUID
+    cam_isim: str
+    thickness_mm: float
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class OtherMaterialOut(BaseModel):
+    id: UUID
+    diger_malzeme_isim: str
+    birim: str
+    birim_agirlik: float
+    hesaplama_turu: Optional[str]
+    unit_price: Optional[float] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class SystemBasicOut(BaseModel):
+    id: UUID
+    name: str
+    description: Optional[str]
+    photo_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    is_active: bool  # ✅ is_active (detay view’larda gösterim için)
+    # (İsteğe bağlı) sort_index burada gerekmez; gerekirse eklenebilir.
+
+    class Config:
+        from_attributes = True
+
+
+# ——————————————————————
+# — Template CRUD Schemas — SystemProfileTemplate —
+class SystemProfileTemplateBase(BaseModel):
+    system_variant_id: UUID
+    profile_id: UUID
+    formula_cut_length: str = Field(..., min_length=1)
+    formula_cut_count: str = Field(..., min_length=1)
+    # NEW
+    is_painted: bool = False
+
+class SystemProfileTemplateCreate(SystemProfileTemplateBase):
+    order_index: Optional[int] = None
+    pdf: Optional[PdfFlags] = None
+
+class SystemProfileTemplateUpdate(BaseModel):
+    formula_cut_length: str = Field(..., min_length=1)
+    formula_cut_count: str = Field(..., min_length=1)
+    order_index: Optional[int] = None
+    # NEW
+    is_painted: Optional[bool] = None
+    pdf: Optional[PdfFlags] = None
+
+class SystemProfileTemplateOut(SystemProfileTemplateBase):
+    id: UUID
+    order_index: Optional[int]
+    created_at: datetime
+    # NEW (base’de zaten var ama burada “bool” olarak garanti edelim)
+    is_painted: bool
+    pdf: PdfFlags
+
+    class Config:
+        from_attributes = True
+
+
+# — SystemGlassTemplate —
+class SystemGlassTemplateBase(BaseModel):
+    system_variant_id: UUID
+    glass_type_id: UUID
+    formula_width: str = Field(..., min_length=1)
+    formula_height: str = Field(..., min_length=1)
+    formula_count: str = Field(..., min_length=1)
+
+class SystemGlassTemplateCreate(SystemGlassTemplateBase):
+    order_index: Optional[int] = None
+    pdf: Optional[PdfFlags] = None
+
+class SystemGlassTemplateUpdate(BaseModel):
+    formula_width: str = Field(..., min_length=1)
+    formula_height: str = Field(..., min_length=1)
+    formula_count: str = Field(..., min_length=1)
+    order_index: Optional[int] = None
+    pdf: Optional[PdfFlags] = None
+
+
+class SystemGlassTemplateOut(BaseModel):
+    id: UUID
+    created_at: datetime
+    pdf: PdfFlags
+
+    class Config:
+        from_attributes = True
+
+
+# — SystemMaterialTemplate —
+class SystemMaterialTemplateBase(BaseModel):
+    system_variant_id: UUID
+    material_id: UUID
+    formula_quantity: str = Field(..., min_length=1)
+    formula_cut_length: Optional[str] = None
+    unit_price: Optional[float] = None   # şablon bazında fiyat override
+
+    # ✅ YENİ
+    type: Optional[str] = Field(default=None, max_length=50)
+    piece_length_mm: Optional[int] = None
+
+class SystemMaterialTemplateCreate(SystemMaterialTemplateBase):
+    order_index: Optional[int] = None
+    pdf: Optional[PdfFlags] = None
+
+class SystemMaterialTemplateUpdate(BaseModel):
+    formula_quantity: str = Field(..., min_length=1)
+    formula_cut_length: Optional[str] = None
+    unit_price: Optional[float] = None
+    type: Optional[str] = Field(default=None, max_length=50)
+    piece_length_mm: Optional[int] = None
+    order_index: Optional[int] = None
+    pdf: Optional[PdfFlags] = None
+
+
+class SystemMaterialTemplateOut(SystemMaterialTemplateBase):
+    id: UUID
+    created_at: datetime
+    pdf: PdfFlags
+
+    class Config:
+        from_attributes = True
+
+
+# — SystemRemoteTemplate —
+
+class SystemRemoteTemplateOut(BaseModel):
+    id: UUID
+    system_variant_id: UUID
+    remote_id: UUID
+    order_index: Optional[int] = None
+    created_at: datetime
+    pdf: PdfFlags
+
+    class Config:
+        from_attributes = True
+
+
+class SystemRemoteTemplateCreate(BaseModel):
+    system_variant_id: UUID
+    remote_id: UUID
+    order_index: Optional[int] = None
+    pdf: Optional[PdfFlags] = None
+
+class SystemRemoteTemplateUpdate(BaseModel):
+    remote_id: Optional[UUID] = None
+    order_index: Optional[int] = None
+    pdf: Optional[PdfFlags] = None
+
+
+
+class RemoteTemplateOut(BaseModel):
+    id: UUID
+    system_variant_id: UUID
+    remote_id: UUID
+    order_index: Optional[int] = None
+    created_at: Optional[datetime]
+
+    # ilişki
+    remote: RemoteOut
+
+    pdf: PdfFlags
+
+    class Config:
+        from_attributes = True
+
+# ——————————————————————
+# ——————————————————————
+# Toplu GET için “view” Şemaları
+class ProfileTemplateOut(BaseModel):
+    profile_id: UUID
+    formula_cut_length: str
+    formula_cut_count: str
+    order_index: Optional[int] = None
+    # NEW
+    is_painted: bool
+    profile: ProfileOut
+    pdf: PdfFlags
+
+    class Config:
+        from_attributes = True
+
+
+
+class GlassTemplateOut(BaseModel):
+    glass_type_id: UUID
+    formula_width: str
+    formula_height: str
+    formula_count: str
+    order_index: Optional[int] = None
+    glass_type: GlassTypeOut
+    pdf: PdfFlags
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialTemplateOut(BaseModel):
+    material_id: UUID
+    formula_quantity: str
+    formula_cut_length: Optional[str] = None
+    unit_price: Optional[float] = None   # şablon üzerindeki fiyat (varsa)
+    type: Optional[str] = None
+    piece_length_mm: Optional[int] = None
+    order_index: Optional[int] = None
+    material: OtherMaterialOut
+    pdf: PdfFlags
+
+    class Config:
+        from_attributes = True
+
+
+
+class SystemTemplatesOut(BaseModel):
+    profileTemplates: List[ProfileTemplateOut]
+    glassTemplates: List[GlassTemplateOut]
+    materialTemplates: List[MaterialTemplateOut]
+    remoteTemplates: List[RemoteTemplateOut]
+
+    class Config:
+        from_attributes = True
+
+class SystemVariantDetailOut(BaseModel):
+    id: UUID
+    name: str
+    photo_url: Optional[str] = None
+    pdf_foto_cikti: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    is_active: bool  # ✅ is_active (detay)
+    system: SystemBasicOut
+    profile_templates: List[ProfileTemplateOut]
+    glass_templates: List[GlassTemplateOut]
+    material_templates: List[MaterialTemplateOut]
+    remote_templates: List[RemoteTemplateOut]
+
+    class Config:
+        from_attributes = True
+
+# ——————————————————————
+# ——————————————————————
+# New: Bulk-create a SystemVariant with its templates
+class ProfileTemplateIn(BaseModel):
+    profile_id: UUID
+    formula_cut_length: str = Field(..., min_length=1)
+    formula_cut_count: str = Field(..., min_length=1)
+    order_index: Optional[int] = None
+    # NEW
+    is_painted: Optional[bool] = False
+    # +++
+    pdf: Optional[PdfFlags] = None
+
+
+
+class GlassTemplateIn(BaseModel):
+    glass_type_id: UUID
+    formula_width: str = Field(..., min_length=1)
+    formula_height: str = Field(..., min_length=1)
+    formula_count: str = Field(..., min_length=1)
+    order_index: Optional[int] = None
+    # +++
+    pdf: Optional[PdfFlags] = None
+
+class MaterialTemplateIn(BaseModel):
+    material_id: UUID
+    formula_quantity: str = Field(..., min_length=1)
+    formula_cut_length: Optional[str] = None
+    unit_price: Optional[float] = None
+    type: Optional[str] = Field(default=None, max_length=50)
+    piece_length_mm: Optional[int] = None
+    order_index: Optional[int] = None
+    # +++
+    pdf: Optional[PdfFlags] = None
+
+
+class RemoteTemplateIn(BaseModel):
+    remote_id: UUID
+    order_index: Optional[int] = None
+    # +++
+    pdf: Optional[PdfFlags] = None
+
+
+
+class SystemVariantCreateWithTemplates(BaseModel):
+    system_id: UUID = Field(..., alias="systemId")
+    name: str = Field(..., min_length=1)
+    pdf_foto_cikti: Optional[str] = None
+    is_active: Optional[bool] = True  # ✅ is_active (opsiyonel)
+    # ✅ Yeni: varyant başlangıç sırası (opsiyonel)
+    sort_index: Optional[int] = 0
+    profile_templates: List[ProfileTemplateIn] = Field(default_factory=list)
+    glass_templates: List[GlassTemplateIn] = Field(default_factory=list)
+    material_templates: List[MaterialTemplateIn] = Field(default_factory=list)
+    remote_templates: List[RemoteTemplateIn] = Field(default_factory=list)
+
+    class Config:
+        allow_population_by_field_name = True
+        from_attributes = True
+
+# ——————————————————————
+# New: Update a SystemVariant + templates
+class SystemVariantUpdateWithTemplates(BaseModel):
+    name: Optional[str] = None
+    pdf_foto_cikti: Optional[str] = None
+    is_active: Optional[bool] = None  # ✅ is_active
+    # ✅ Yeni: varyant sırası (opsiyonel)
+    sort_index: Optional[int] = None
+    profile_templates: List[ProfileTemplateIn] = Field(default_factory=list)
+    glass_templates: List[GlassTemplateIn] = Field(default_factory=list)
+    material_templates: List[MaterialTemplateIn] = Field(default_factory=list)
+    remote_templates: List[RemoteTemplateIn] = Field(default_factory=list)
+    
+    class Config:
+        from_attributes = True
+
+class SystemVariantReassignIn(BaseModel):
+    system_id: UUID
+
+
+# ——————————————————————
+# (Opsiyonel) Toplu sıralama (reorder) inputları
+class ReorderItem(BaseModel):
+    id: UUID
+    sort_index: int
+
+class SystemReorderIn(BaseModel):
+    items: List[ReorderItem]
+
+class SystemVariantReorderIn(BaseModel):
+    # İsteğe bağlı güvenlik/validasyon için system_id gönderebilirsin; route tarafında doğrularız.
+    system_id: Optional[UUID] = None
+    items: List[ReorderItem]

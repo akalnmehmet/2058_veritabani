@@ -1,91 +1,243 @@
-# Tümen Alüminyum - Üretim ve Yönetim Sistemi 🚀
+# Tümen Alüminyum - Bayi Yönetim ve Üretim Sistemi
 
-Modern, güvenilir ve yüksek performanslı **Alüminyum ve Cam Üretim Yönetim Sistemi**. Bu proje, kurumsal üretim süreçlerini optimize etmek, maliyetleri en aza indirmek ve müşterilere hızlı teklifler sunabilmek amacıyla geliştirilmiştir. Premium **Glassmorphism** tasarım diliyle hazırlanmış arayüzü sayesinde son derece şık ve kullanıcı dostu bir deneyim sunar.
+![FastAPI](https://img.shields.io/badge/FastAPI-0.116-005571?style=for-the-badge&logo=fastapi)
+![React](https://img.shields.io/badge/React-19-20232a?style=for-the-badge&logo=react&logoColor=61DAFB)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-red?style=for-the-badge)
 
-![Glassmorphism UI](https://img.shields.io/badge/UI-Glassmorphism-blue?style=for-the-badge)
-![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
-![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
-![Postgres](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
-
----
-
-## 🌟 Öne Çıkan Özellikler
-
-* **Müşteri ve Teklif Yönetimi:** Müşteri kayıtlarını tutma, onlara özel dinamik alüminyum ve cam sistem teklifleri hazırlama.
-* **Premium Arayüz (Glassmorphism):** Saydam yüzeyler, arka plan bulanıklığı (backdrop-blur) ve yumuşatılmış köşeler ile modern, göz yormayan bir tasarım.
-* **Malzeme Yönetimi:** Profiller, Camlar, Boyalar, Kumandalar ve Diğer Malzemelerin birim fiyat, ağırlık ve özellik bazında detaylı takibi.
-* **Sistem ve Varyant Altyapısı:** Birleştirilebilir profil ve camlardan oluşan dinamik üretim sistemlerinin kurgulanması.
-* **Optimizasyon Motoru:** Bıçak ve boya firelerini hesaplayarak optimum üretim maliyetini çıkaran gelişmiş algoritmalar.
-* **Dinamik PDF Üretimi:** Teklif ve siparişlerin saniyeler içinde markaya özel PDF belgelerine dönüştürülmesi.
-* **Sipariş ve Üretim Takibi:** Tekliften üretime geçen siparişlerin durumlarını yönetme ve takip etme.
+Tümen Alüminyum için geliştirilmiş; **bayi yönetimi**, **proje tekliflendirme**, **sipariş takibi** ve **üretim süreçlerini** dijitalleştiren tam yığın (full-stack) web uygulaması.
 
 ---
 
-## 🛠️ Teknoloji Yığını
+## Özellikler
 
-### Frontend (İstemci)
-* **Kütüphane:** React 18
-* **Derleyici:** Vite
-* **Tasarım:** Tailwind CSS & DaisyUI
-* **Durum Yönetimi:** Redux & React-Redux
-* **Stil Mimarisi:** Custom Glassmorphism UI
-
-### Backend (Sunucu)
-* **Framework:** FastAPI (Python)
-* **Veritabanı:** PostgreSQL
-* **ORM:** SQLAlchemy
-* **Migration:** Alembic
-* **Kimlik Doğrulama:** JWT (JSON Web Tokens)
+- **Çoklu Rol Yönetimi** — Admin ve Bayi (Dealer) yetki seviyeleri
+- **Dinamik Ürün Kataloğu** — Sistem, varyant, profil, cam, renk ve aksesuar yönetimi
+- **Proje & Teklif Motoru** — Metraj, kesim listesi ve maliyet hesaplama
+- **PDF Raporlama** — Teklif formu, imalat/kesim listesi, cam sipariş listesi
+- **Üretim Takibi** — Boya, cam ve montaj durum yönetimi
+- **Bayi Davet Sistemi** — E-posta ile davet, şifre belirleme ve sıfırlama
+- **Müşteri Yönetimi** — Bayiye özel müşteri kayıtları
+- **Sipariş Yönetimi** — Onaylanan tekliflerin siparişe dönüştürülmesi
+- **Glassmorphism UI** — Modern, kurumsal arayüz tasarımı
 
 ---
 
-## 🚀 Kurulum ve Çalıştırma
+## Teknoloji Yığını
 
-### 1. Gereksinimler
-- Node.js (v16 veya üzeri)
-- Python (v3.9 veya üzeri)
-- PostgreSQL
+### Backend
+| Bileşen | Teknoloji |
+|---------|-----------|
+| Framework | FastAPI 0.116 |
+| Dil | Python 3.14 |
+| Veritabanı | PostgreSQL 18 |
+| ORM | SQLAlchemy 2.0 |
+| Migrasyon | Alembic |
+| Veri Doğrulama | Pydantic v2 + pydantic-settings |
+| Kimlik Doğrulama | OAuth2 + JWT (Access & Refresh Token) |
+| Şifreleme | bcrypt + passlib |
+| Sunucu | Uvicorn |
+
+### Frontend
+| Bileşen | Teknoloji |
+|---------|-----------|
+| Kütüphane | React 19 |
+| Dil | TypeScript |
+| Build Aracı | Vite 6 |
+| Stil | Tailwind CSS v4 |
+| Durum Yönetimi | Redux + React-Redux |
+| HTTP İstemci | Axios + Fetch API |
+| Tablo | TanStack Table v8 |
+| PDF | jsPDF + html2pdf.js |
+
+---
+
+## Proje Yapısı
+
+```
+veritabani_odev/
+├── backend/
+│   ├── app/
+│   │   ├── api/            # Bağımlılık enjeksiyonu (deps.py)
+│   │   ├── core/           # Ayarlar, güvenlik, e-posta
+│   │   ├── crud/           # Veritabanı işlem katmanı (16 modül)
+│   │   ├── db/             # SQLAlchemy engine & session
+│   │   ├── models/         # ORM modelleri (20+ tablo)
+│   │   ├── routes/         # API endpoint'leri (15 router)
+│   │   ├── schemas/        # Pydantic request/response şemaları
+│   │   ├── services/       # İş mantığı (token servisi)
+│   │   └── utils/          # Yardımcı fonksiyonlar
+│   ├── migrations/         # Alembic migrasyon dosyaları (40+ versiyon)
+│   ├── main.py             # FastAPI uygulama giriş noktası
+│   ├── requirements.txt    # Python bağımlılıkları
+│   └── .env                # Ortam değişkenleri (repo'ya dahil değil)
+├── frontend/
+│   ├── src/
+│   │   ├── global/         # Layout, Sidebar, Topbar, AuthGuard
+│   │   ├── scenes/         # Sayfa bileşenleri
+│   │   ├── redux/          # Actions, reducers, store
+│   │   ├── lib/            # API istemcisi, yardımcılar
+│   │   └── components/     # Paylaşılan UI bileşenleri
+│   ├── .env.local          # Ortam değişkenleri (repo'ya dahil değil)
+│   └── package.json
+└── README.md
+```
+
+---
+
+## Kurulum
+
+### Gereksinimler
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 14+
+
+### 1. Repoyu Klonlayın
+
+```bash
+git clone https://github.com/akalnmehmet/2058_veritabani.git
+cd 2058_veritabani
+```
 
 ### 2. Backend Kurulumu
+
 ```bash
 cd backend
-python -m venv venv
-# Windows için: venv\Scripts\activate
-# Mac/Linux için: source venv/bin/activate
 
+# Sanal ortam oluştur ve aktif et
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # Linux / macOS
+
+# Bağımlılıkları yükle
 pip install -r requirements.txt
+```
 
-# Veritabanını oluşturma ve migrasyonlar (alembic.ini yapılandırmasını kontrol edin)
+**`.env` dosyası oluşturun** (`backend/.env`):
+
+```env
+DATABASE_URL=postgresql+psycopg2://postgres:SIFRE@localhost:5432/VERITABANI_ADI
+SECRET_KEY=guclu-ve-rastgele-bir-gizli-anahtar
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=30
+MEDIA_ROOT=media
+FRONTEND_URL=http://localhost:5173
+BACKEND_CORS_ORIGINS_RAW=http://localhost:5173,http://127.0.0.1:5173
+DEBUG=True
+```
+
+**Veritabanı oluştur ve migrasyonları uygulayın:**
+
+```bash
+# PostgreSQL'de veritabanı oluştur
+psql -U postgres -c "CREATE DATABASE VERITABANI_ADI;"
+
+# Alembic migrasyonlarını çalıştır
 alembic upgrade head
+```
 
-# Sunucuyu başlatma
-uvicorn app.main:app --reload
+**İlk admin kullanıcısını oluşturun:**
+
+```bash
+python - <<'EOF'
+import sys; sys.path.insert(0, '.')
+import app.models.app_user, app.models.order, app.models.customer
+import app.models.project, app.models.system, app.models.color
+import app.models.glass_type, app.models.other_material, app.models.profile
+import app.models.remote, app.models.RefreshToken, app.models.user_token
+import app.models.pdf, app.models.calculation_helper
+import app.models.dealer_profile_picture, app.models.project_code_rule
+import app.models.project_code_ledger, app.models.system_glass_template
+import app.models.system_material_template, app.models.system_profile_template
+import app.models.system_remote_template
+import uuid
+from app.db.session import SessionLocal
+from app.models.app_user import AppUser
+from app.core.security import get_password_hash
+
+db = SessionLocal()
+admin = AppUser(id=uuid.uuid4(), username='admin',
+    password_hash=get_password_hash('admin123'),
+    role='admin', name='Admin', email='admin@tumen.com', status='active')
+db.add(admin); db.commit(); db.close()
+print("Admin oluşturuldu. Kullanıcı: admin / Şifre: admin123")
+EOF
+```
+
+**Backend'i başlatın:**
+
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 3. Frontend Kurulumu
+
 ```bash
 cd frontend
 npm install
+```
 
-# Geliştirme sunucusunu başlatma
+**`.env.local` dosyası oluşturun** (`frontend/.env.local`):
+
+```env
+VITE_API_BASE_URL=http://localhost:8000/api
+```
+
+**Frontend'i başlatın:**
+
+```bash
 npm run dev
 ```
 
 ---
 
-## 🎨 Tasarım Detayları (UI/UX)
-Sistem baştan aşağı yenilenerek, modern uygulamaların trendi olan **Glassmorphism** yapısına bürünmüştür:
-* **Kartlar ve Tablolar:** Yarı saydam arka planlar (`bg-card/50`), yumuşak gölgeler (`shadow-sm`) ve `backdrop-blur-md` efektleri.
-* **Form Elemanları:** Dinamik odaklanma efektleri (`focus:ring-primary/10`) ile temiz input ve buton yapıları.
-* **Renk Paleti:** Kurumsal kimliği yansıtan modern lacivert ve gri tonlar.
+## Erişim
+
+| Servis | Adres |
+|--------|-------|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
+
+**Varsayılan Admin Girişi:**
+- Kullanıcı adı: `admin`
+- Şifre: `admin123`
 
 ---
 
-## 👥 Geliştiriciler
+## API Endpoint'leri
+
+| Prefix | Açıklama |
+|--------|----------|
+| `POST /api/auth/token` | Giriş (access + refresh token) |
+| `POST /api/auth/refresh` | Token yenileme |
+| `POST /api/auth/logout` | Çıkış |
+| `GET/POST /api/projects` | Proje yönetimi |
+| `GET/POST /api/systems` | Sistem & varyant yönetimi |
+| `GET/POST /api/customers` | Müşteri yönetimi |
+| `GET/POST /api/dealers/invite` | Bayi davet & yönetimi |
+| `GET/POST /api/colors` | Renk kataloğu |
+| `GET/POST /api/catalog` | Katalog yayın yönetimi |
+| `GET/POST /api/me/*` | Profil, PDF ayarları, proje kodu |
+
+---
+
+## Notlar
+
+- **DEBUG=True** modunda e-posta gönderilemese bile bayi daveti tamamlanır; davet linki API response'unda `invite_link` alanında döner.
+- Medya dosyaları (profil resimleri, sistem fotoğrafları) `backend/media/` dizininde tutulur.
+- Production ortamında `DEBUG=False` yapılmalı ve geçerli bir SMTP sunucusu yapılandırılmalıdır.
+
+---
+
+## Geliştiriciler
+
 Bu proje **Mehmet AKALIN**, **Serhat KABA** ve **Emre ÖZCAN** tarafından geliştirilmiştir.
 
 ---
 
-## 📝 Lisans
-Bu projenin tüm telif hakları geliştiricisine ve projeyi talep eden kuruma aittir. İzinsiz kopyalanamaz veya çoğaltılamaz.
+## Lisans
+
+Tüm telif hakları geliştiricilere ve projeyi talep eden kuruma aittir. İzinsiz kopyalanamaz veya çoğaltılamaz.

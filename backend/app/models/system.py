@@ -1,102 +1,130 @@
+# app/models/system.py
+
 import uuid
-from sqlalchemy import Column, String, Boolean, ForeignKey, Integer, Text, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, TEXT, Numeric, ForeignKey, Boolean, event, update, Integer, Index
+from sqlalchemy.dialects.postgresql import UUID, TIMESTAMP
+from sqlalchemy.sql import func, expression
 from sqlalchemy.orm import relationship
-from app.db.database import Base
 
-
-def gen_uuid():
-    return str(uuid.uuid4())
+from app.db.base import Base
 
 
 class System(Base):
     __tablename__ = "system"
 
-    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    name = Column(String(200), unique=True, nullable=False)
-    is_published = Column(Boolean, default=True)
-    is_active = Column(Boolean, default=True)
-    sort_index = Column(Integer, default=0)
-    photo_path = Column(String(500), nullable=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), unique=True, nullable=False)
+    description = Column(TEXT, nullable=True)
+    photo_url = Column(String(300), nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(
+        TIMESTAMP(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now()
+    )
 
-    variants = relationship("SystemVariant", back_populates="system", cascade="all, delete-orphan")
+    # ✅ publish + soft delete
+    is_published = Column(Boolean, nullable=False, server_default=expression.false())
+    is_deleted   = Column(Boolean, nullable=False, server_default=expression.false())
+
+    # ✅ aktif/pasif etiketi
+    is_active = Column(Boolean, nullable=False, server_default=expression.true())
+
+    # ✅ Liste sırası (küçük -> önce). Varsayılan 0
+    sort_index = Column(Integer, nullable=False, server_default="0", default=0)
+
+    # Bir system birden fazla varyanta sahiptir
+    variants = relationship(
+        "SystemVariant",
+        back_populates="system",
+        cascade="all, delete-orphan",
+        order_by=lambda: SystemVariant.sort_index.asc()  # ✅ güvenli
+    )
+
+
+    # DB indeksleri
+    __table_args__ = (
+        Index("ix_system_sort_index", "sort_index"),
+    )
 
 
 class SystemVariant(Base):
     __tablename__ = "system_variant"
 
-    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    system_id = Column(UUID(as_uuid=False), ForeignKey("system.id", ondelete="CASCADE"), nullable=False)
-    name = Column(String(200), nullable=False)
-    is_published = Column(Boolean, default=True)
-    is_active = Column(Boolean, default=True)
-    sort_index = Column(Integer, default=0)
-    photo_path = Column(String(500), nullable=True)
-    pdf_photo_path = Column(String(500), nullable=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    system_id     = Column(
+        UUID(as_uuid=True),
+        ForeignKey("system.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    name          = Column(String(100), nullable=False)
+    photo_url     = Column(String(300), nullable=True)
+    pdf_foto_cikti = Column(String(300), nullable=True)
+    created_at    = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at    = Column(
+        TIMESTAMP(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now()
+    )
 
+    # ✅ publish + soft delete
+    is_published = Column(Boolean, nullable=False, server_default=expression.false())
+    is_deleted   = Column(Boolean, nullable=False, server_default=expression.false())
+
+    # ✅ aktif/pasif etiketi
+    is_active = Column(Boolean, nullable=False, server_default=expression.true())
+
+    # ✅ Aynı system içindeki liste sırası (küçük -> önce). Varsayılan 0
+    sort_index = Column(Integer, nullable=False, server_default="0", default=0)
+
+    # System ile iki yönlü ilişki
     system = relationship("System", back_populates="variants")
-    profile_templates = relationship("SystemProfileTemplate", back_populates="variant", cascade="all, delete-orphan")
-    glass_templates = relationship("SystemGlassTemplate", back_populates="variant", cascade="all, delete-orphan")
-    material_templates = relationship("SystemMaterialTemplate", back_populates="variant", cascade="all, delete-orphan")
-    remote_templates = relationship("SystemRemoteTemplate", back_populates="variant", cascade="all, delete-orphan")
-    project_systems = relationship("ProjectSystem", back_populates="variant")
+
+    # Template tablolarıyla ilişkiler
+    profile_templates  = relationship(
+        "SystemProfileTemplate",
+        back_populates="variant",
+        cascade="all, delete-orphan",
+    )
+    glass_templates    = relationship(
+        "SystemGlassTemplate",
+        back_populates="variant",
+        cascade="all, delete-orphan",
+    )
+    material_templates = relationship(
+        "SystemMaterialTemplate",
+        back_populates="variant",
+        cascade="all, delete-orphan",
+    )
+    remote_templates = relationship(
+        "SystemRemoteTemplate",
+        back_populates="variant",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    # --- UI için: bağlı olduğu System'in adı ---
+    @property
+    def system_name(self) -> str:
+        # FK not null olduğu için normalde her zaman bir System vardır.
+        # Yine de None koruması ekliyoruz.
+        return self.system.name if self.system is not None else ""
+    # DB indeksleri
+    __table_args__ = (
+        Index("ix_system_variant_system_sort_index", "system_id", "sort_index"),
+    )
 
 
-class SystemProfileTemplate(Base):
-    __tablename__ = "system_profile_template"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    variant_id = Column(UUID(as_uuid=False), ForeignKey("system_variant.id", ondelete="CASCADE"), nullable=False)
-    profile_id = Column(UUID(as_uuid=False), ForeignKey("profile.id", ondelete="CASCADE"), nullable=False)
-    formula_cut_length = Column(String(500), nullable=False)
-    formula_cut_count = Column(String(500), nullable=False)
-    is_painted = Column(Boolean, default=False)
-    pdf_flags = Column(JSON, nullable=True)
-
-    variant = relationship("SystemVariant", back_populates="profile_templates")
-    profile = relationship("Profile", back_populates="system_templates")
-
-
-class SystemGlassTemplate(Base):
-    __tablename__ = "system_glass_template"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    variant_id = Column(UUID(as_uuid=False), ForeignKey("system_variant.id", ondelete="CASCADE"), nullable=False)
-    glass_type_id = Column(UUID(as_uuid=False), ForeignKey("glass_type.id", ondelete="CASCADE"), nullable=False)
-    formula_width = Column(String(500), nullable=False)
-    formula_height = Column(String(500), nullable=False)
-    formula_count = Column(String(500), nullable=False)
-    default_color_id = Column(UUID(as_uuid=False), ForeignKey("color.id", ondelete="SET NULL"), nullable=True)
-    pdf_flags = Column(JSON, nullable=True)
-
-    variant = relationship("SystemVariant", back_populates="glass_templates")
-    glass_type = relationship("GlassType", back_populates="system_templates")
-    default_color = relationship("Color", back_populates="glass_templates", foreign_keys=[default_color_id])
-
-
-class SystemMaterialTemplate(Base):
-    __tablename__ = "system_material_template"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    variant_id = Column(UUID(as_uuid=False), ForeignKey("system_variant.id", ondelete="CASCADE"), nullable=False)
-    material_id = Column(UUID(as_uuid=False), ForeignKey("other_material.id", ondelete="CASCADE"), nullable=False)
-    formula_quantity = Column(String(500), nullable=False)
-    formula_cut_length = Column(String(500), nullable=True)
-    unit_price = Column(String(500), nullable=True)
-    pdf_flags = Column(JSON, nullable=True)
-
-    variant = relationship("SystemVariant", back_populates="material_templates")
-    material = relationship("OtherMaterial", back_populates="system_templates")
-
-
-class SystemRemoteTemplate(Base):
-    __tablename__ = "system_remote_template"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    variant_id = Column(UUID(as_uuid=False), ForeignKey("system_variant.id", ondelete="CASCADE"), nullable=False)
-    remote_id = Column(UUID(as_uuid=False), ForeignKey("remote.id", ondelete="CASCADE"), nullable=False)
-    order_index = Column(Integer, default=0)
-    pdf_flags = Column(JSON, nullable=True)
-
-    variant = relationship("SystemVariant", back_populates="remote_templates")
-    remote = relationship("Remote", back_populates="system_templates")
+# ─────────────────────────────────────────────────────────────────────────────
+# Otomatik senkron: Bir System is_active = false yapılırsa, tüm varyantlarını da
+# false'a çevir. true yapılırsa varyantları zorla true yapmıyoruz (manuel kalabilir).
+# Bu mantık "model seviyesi"nde garanti edilir.
+# ─────────────────────────────────────────────────────────────────────────────
+@event.listens_for(System, "after_update")
+def system_after_update(mapper, connection, target: System):
+    # Sadece false'a geçişi zorunlu kapatma sayıyoruz
+    if target.is_active is False:
+        connection.execute(
+            update(SystemVariant)
+            .where(SystemVariant.system_id == target.id)
+            .values(is_active=False)
+        )

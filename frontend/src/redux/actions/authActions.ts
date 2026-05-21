@@ -269,7 +269,7 @@ export const changeUsername = (new_username) => async (dispatch) => {
   try {
     const { data } = await api.post(
       "/auth/change-username",
-      { new_username },
+      { username: new_username },
       {
         headers: {
           accept: "application/json",
